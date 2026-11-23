@@ -6,6 +6,11 @@ Gemini is NEVER used to decide emergency risk, and never sees names/contacts.
 
 Every call degrades gracefully: if no API key or the call fails, callers fall back to
 deterministic templates so the app remains functional (and testable offline).
+
+Supported free-tier models (Google AI Studio):
+  gemini-1.5-flash   (recommended — fast, free, 1M context)
+  gemini-1.5-pro     (slower, free quota limited)
+  gemini-2.0-flash   (free tier available)
 """
 from __future__ import annotations
 
@@ -48,12 +53,14 @@ Do not repeat anything in ALREADY_ASKED. Output ONLY the question text."""
 
 class GeminiClient:
     def __init__(self, api_key: str, model: str, timeout: int = 30):
-        self.api_key, self.model, self.timeout = api_key, model, timeout
+        self.api_key = api_key
+        self.model = model
+        self.timeout = timeout
         self._client = None
 
     @property
     def enabled(self) -> bool:
-        return bool(self.api_key)
+        return bool(self.api_key) and self.api_key not in ("YOUR_GEMINI_API_KEY_HERE", "your-api-key-here", "")
 
     def _get(self):
         if self._client is None:
@@ -63,17 +70,45 @@ class GeminiClient:
 
     def _generate(self, system: str, user: str, json_mode: bool, max_tokens: int = 900) -> str | None:
         if not self.enabled:
+            log.debug("Gemini disabled (no API key configured).")
             return None
         try:
             from google.genai import types
             cfg = types.GenerateContentConfig(
-                system_instruction=system, temperature=0.2, max_output_tokens=max_tokens,
+                system_instruction=system,
+                temperature=0.2,
+                max_output_tokens=max_tokens,
                 response_mime_type="application/json" if json_mode else "text/plain",
             )
-            resp = self._get().models.generate_content(model=self.model, contents=user, config=cfg)
-            return (resp.text or "").strip() or None
-        except Exception as exc:  # network / quota / safety block
-            log.warning("Gemini call failed: %s", type(exc).__name__)
+            resp = self._get().models.generate_content(
+                model=self.model,
+                contents=user,
+                config=cfg,
+            )
+            text = (resp.text or "").strip()
+            return text or None
+        except Exception as exc:
+            exc_type = type(exc).__name__
+            msg = str(exc)
+            # Provide actionable log messages for common issues
+            if "API_KEY_INVALID" in msg or "API key not valid" in msg:
+                log.error(
+                    "Gemini API key is invalid. Get a free key at https://aistudio.google.com/apikey "
+                    "and set GEMINI_API_KEY in your .env file."
+                )
+            elif "QUOTA_EXCEEDED" in msg or "quota" in msg.lower():
+                log.warning("Gemini quota exceeded. The app will fall back to deterministic templates.")
+            elif "MODEL_NOT_FOUND" in msg or "not found" in msg.lower():
+                log.error(
+                    "Gemini model '%s' not found. Try setting GEMINI_MODEL=gemini-1.5-flash in .env", self.model
+                )
+            elif "SAFETY" in msg:
+                log.warning("Gemini safety filter triggered. Using fallback template.")
+            else:
+                log.warning("Gemini call failed (%s): %s", exc_type, msg[:200])
+            # Reset client on connection errors so the next call retries
+            if exc_type in ("ConnectTimeout", "ReadTimeout", "ConnectionError"):
+                self._client = None
             return None
 
     @staticmethod
@@ -111,8 +146,11 @@ class GeminiClient:
         return out
 
     def clarifying_question(self, symptoms: list[str], language: str, already_asked: list[str]) -> str | None:
-        raw = self._generate(SYSTEM_QUESTION.format(language=LANG_NAME.get(language, "English")),
-                             f"SYMPTOMS: {', '.join(symptoms)}\nALREADY_ASKED: {already_asked}", False, 120)
+        raw = self._generate(
+            SYSTEM_QUESTION.format(language=LANG_NAME.get(language, "English")),
+            f"SYMPTOMS: {', '.join(symptoms)}\nALREADY_ASKED: {already_asked}",
+            False, 120,
+        )
         if raw and len(raw) < 220 and "?" in raw or (raw and raw.endswith(("?", "？"))):
             return raw
         return None
@@ -126,19 +164,32 @@ class GeminiClient:
                          "remedy": r["remedy_en"], "author": r["author"], "book": r["book"],
                          "matched_symptoms": r.get("matched_symptoms", [])} for r in records],
         }
-        data = self._json(self._generate(SYSTEM_GROUNDED.format(language=LANG_NAME.get(language, "English")),
-                                         json.dumps(payload, ensure_ascii=False), True, 900))
+        data = self._json(self._generate(
+            SYSTEM_GROUNDED.format(language=LANG_NAME.get(language, "English")),
+            json.dumps(payload, ensure_ascii=False),
+            True, 900,
+        ))
         return data if isinstance(data, dict) else None
 
     def translate_remedy(self, text: str, language: str) -> str | None:
-        return self._generate(SYSTEM_TRANSLATE.format(language=LANG_NAME.get(language, "English")), text, False, 400)
+        return self._generate(
+            SYSTEM_TRANSLATE.format(language=LANG_NAME.get(language, "English")),
+            text, False, 400,
+        )
 
     def summarise_external(self, results: list[dict], language: str, symptoms: list[str]) -> str | None:
-        system = ("Summarise the provided SNIPPETS from trusted health websites in " + LANG_NAME.get(language, "English") +
-                  ". Use ONLY the snippets. NO dosages, NO prescriptions, NO treatment instructions, NO diagnosis. "
-                  "2-3 sentences of general education. Mention that this is external information. Output plain text only.")
-        return self._generate(system, json.dumps({"symptoms": symptoms, "SNIPPETS": [
-            {"source": r["source"], "title": r["title"], "snippet": r["snippet"]} for r in results]}, ensure_ascii=False), False, 400)
+        system = (
+            "Summarise the provided SNIPPETS from trusted health websites in " + LANG_NAME.get(language, "English") +
+            ". Use ONLY the snippets. NO dosages, NO prescriptions, NO treatment instructions, NO diagnosis. "
+            "2-3 sentences of general education. Mention that this is external information. Output plain text only."
+        )
+        return self._generate(
+            system,
+            json.dumps({"symptoms": symptoms, "SNIPPETS": [
+                {"source": r["source"], "title": r["title"], "snippet": r["snippet"]} for r in results
+            ]}, ensure_ascii=False),
+            False, 400,
+        )
 
 
 # ------------------------------------------------------------ output guards

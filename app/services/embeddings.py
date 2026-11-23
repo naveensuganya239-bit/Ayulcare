@@ -75,11 +75,25 @@ class HashingEmbedder(BaseEmbedder):
         return (out / norms).astype("float32")
 
 
+import logging
+log = logging.getLogger(__name__)
+
 _CACHE: dict[tuple, BaseEmbedder] = {}
 
 
 def get_embedder(backend: str, model_name: str) -> BaseEmbedder:
     key = (backend, model_name)
     if key not in _CACHE:
-        _CACHE[key] = HashingEmbedder() if backend == "hash" else SentenceTransformerEmbedder(model_name)
+        if backend == "hash":
+            _CACHE[key] = HashingEmbedder()
+        else:
+            try:
+                _CACHE[key] = SentenceTransformerEmbedder(model_name)
+            except Exception as exc:
+                log.warning(
+                    "SentenceTransformer '%s' could not be loaded (%s: %s). "
+                    "Falling back to HashingEmbedder.",
+                    model_name, type(exc).__name__, exc,
+                )
+                _CACHE[key] = HashingEmbedder()
     return _CACHE[key]

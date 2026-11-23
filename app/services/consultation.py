@@ -297,13 +297,36 @@ class ConsultationEngine:
 
     def _explain(self, user, remedies, risk, sl, lang, notice, user_text):
         if not self.svc.gemini.enabled:
-            return None
+            # Graceful fallback: build a simple summary from retrieved records without Gemini
+            return self._fallback_summary(remedies, lang)
         ctx = ai_safe_context(user.profile, bool(user.consent_ai_context)) if not sl["other_subject"] else {}
         raw = self.svc.gemini.explain(remedies, risk.level, sl["symptoms"], lang, notice, ctx)
         rec_text = " ".join(f"{r['remedy_en']} {r['problem_en']} {r['symptom_en']}" for r in remedies)
         ok = validate_explanation(raw, {r["ref"] for r in remedies}, rec_text, user_text)
         self._last_explanation_rejected = raw is not None and ok is None
+        # If Gemini returned something but it was rejected by validation, use fallback
+        if ok is None and raw is not None:
+            return self._fallback_summary(remedies, lang)
         return ok
+
+    def _fallback_summary(self, remedies: list[dict], lang: str) -> dict | None:
+        """Build a plain-text summary from retrieved records when Gemini is unavailable."""
+        if not remedies:
+            return None
+        problems = list(dict.fromkeys(r["problem_en"] for r in remedies))
+        prob_str = " and ".join(problems[:2])
+        refs = ", ".join(r["ref"] for r in remedies)
+        summary = (
+            f"The Ayurvedic books describe records related to {prob_str}. "
+            f"The retrieved entries ({refs}) mention traditional remedies documented in Ayurvedic texts. "
+            f"Please review each remedy card below for the specific details."
+        )
+        care_note = "If your symptoms are severe, persistent, or worsening, please consult a qualified doctor."
+        why_matched = [
+            {"id": r["ref"], "reason": f"Matched for: {', '.join(r.get('matched_symptoms', []) or [r['symptom_en']][:1])}"}
+            for r in remedies
+        ]
+        return {"summary": summary, "why_matched": why_matched, "care_note": care_note}
 
     def _web_fallback(self, sl, lang, consult, res, risk_level):
         if not (self.svc.web.enabled and sl["symptoms"]):
