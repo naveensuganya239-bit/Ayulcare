@@ -1,0 +1,13 @@
+{% extends "market_base.html" %}
+{% block title %}Privacy and data{% endblock %}
+{% block content %}
+<section class="section"><div class="container" style="max-width:760px">
+<h1>Privacy and data</h1>
+<p class="muted">This is a research prototype. The notice below describes what the software does; the operator must adapt it to their legal context before public launch.</p>
+<h3>What we store</h3><p>Your email, a salted password hash, the profile fields you choose to enter, your consultations and your feedback. Sensitive profile fields, contact number and conversation text are encrypted at rest.</p>
+<h3>What leaves the server</h3><p>Your message text may be sent to the Google Gemini API to understand and explain it, after removing emails, phone numbers and links. Your name, contact details, city and date of birth are never sent. If you switch on "personalise with my health profile", only an age band, long-term conditions text and food preference are shared. Web search, when used, receives only generic symptom terms.</p>
+<h3>Research use</h3><p>Retrieval logs contain extracted English symptom terms, record numbers and scores, with no raw message text and no user identifier. Feedback is included in research statistics only if you opt in.</p>
+<h3>Your control</h3><p>You can edit your profile, download your data, and delete your account with all associated data at any time under Profile.</p>
+<h3>Medical disclaimer</h3><p>Information only. Not a diagnosis, not a replacement for a doctor, and not evidence that any traditional remedy works.</p>
+</div></section>
+{% endblock %}

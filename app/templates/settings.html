@@ -1,0 +1,16 @@
+{% extends "app_base.html" %}
+{% block title %}Profile and settings{% endblock %}
+{% block content %}
+<div class="page-head"><h1>Profile and settings</h1><button class="btn btn-primary" id="save" type="button">Save changes</button></div>
+<div id="err" class="alert alert-error hidden" role="alert"></div>
+<div class="stack" style="--gap:20px;max-width:860px">
+  <section class="card"><h3>Consents</h3><div id="consents" class="stack" style="--gap:12px"></div></section>
+  <section class="card"><h3>Health profile</h3><form id="profile-form" novalidate></form></section>
+  <section class="card"><h3>Your data</h3>
+    <p class="muted">Download everything stored about you, or delete your account and all associated data permanently.</p>
+    <div class="row"><a class="btn btn-ghost" href="/api/account/export" download>Download my data</a>
+    <button class="btn btn-ghost" id="chpw" type="button">Change password</button>
+    <button class="btn btn-danger" id="delete" type="button">Delete account and data</button></div></section>
+</div>
+{% endblock %}
+{% block scripts %}<script type="module" src="{{ url_for('static', filename='js/settings.js') }}"></script>{% endblock %}

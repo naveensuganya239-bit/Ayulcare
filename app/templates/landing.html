@@ -1,0 +1,97 @@
+{% extends "market_base.html" %}
+{% block title %}Ayurvedic information with the book shown{% endblock %}
+{% block content %}
+<section class="hero">
+  <div class="container">
+    <div>
+      <h1>Ask in your own language. See which book the answer comes from.</h1>
+      <p class="lede">Describe what you are feeling in Tamil, Telugu, Hindi or English. Ayurveda AI asks the right follow-up questions, checks for warning signs, and then shows what traditional Ayurvedic books record for those symptoms, with the author and book beside every line.</p>
+      <div class="actions">
+        <a class="btn btn-gold" href="{{ url_for('pages.register') }}">Get started</a>
+        <a class="btn btn-ghost" href="#how">See how it works</a>
+      </div>
+      <p class="small muted" style="margin-top:18px">A research prototype for health information. It does not diagnose and does not replace a doctor.</p>
+    </div>
+    <div>
+      <div class="demo" aria-label="Example conversation">
+        <div class="stack" style="--gap:12px">
+          <div class="bubble user" lang="en">Sore throat for two days, no fever.</div>
+          <div class="bubble bot">Thanks. Do you have any trouble breathing, chest pain, blood in cough, or confusion?</div>
+          <div class="bubble user">No, none of these.</div>
+          <div class="bubble bot">
+            No warning signs found. A traditional record for sore throat describes:
+            <div class="manuscript">
+              <div><strong>Gargle with ginger decoction and honey</strong></div>
+              <div class="src">Dr. M.S. Krishnamurthy - Easy Ayurveda home remedies</div>
+            </div>
+            <div class="small muted" style="margin-top:8px">See a doctor if it lasts more than a few days or gets worse.</div>
+          </div>
+        </div>
+      </div>
+      <p class="demo-note">Illustration of the answer format. The record shown is taken from the project dataset.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="features">
+  <div class="container">
+    <div class="section-head"><h2>Built to be careful, not just clever</h2><p class="muted">Most symptom chatbots jump to an answer. This one is designed around the questions a careful person would ask first.</p></div>
+    <div class="features">
+      <article class="card feature"><div class="ico"><svg><use href="#i-chat"/></svg></div><h3>Consultation-style conversation</h3><p class="muted">Describe the problem naturally. It remembers what you already said and never asks the same thing twice.</p></article>
+      <article class="card feature"><div class="ico"><svg><use href="#i-book"/></svg></div><h3>Every remedy has a source</h3><p class="muted">Author, book and record number appear with each remedy. If the books have nothing relevant, it says so instead of guessing.</p></article>
+      <article class="card feature"><div class="ico"><svg><use href="#i-shield"/></svg></div><h3>Safety checked separately</h3><p class="muted">Warning signs are checked by fixed rules, not by the language model. Emergencies get an immediate message, never a home remedy.</p></article>
+      <article class="card feature"><div class="ico"><svg><use href="#i-globe"/></svg></div><h3>Your language, automatically</h3><p class="muted">Type or speak in English, Tamil, Telugu or Hindi. The reply follows your language, with a manual switch if needed.</p></article>
+      <article class="card feature"><div class="ico"><svg><use href="#i-clock"/></svg></div><h3>Follow-up check-ins</h3><p class="muted">After a day or two it asks how you are doing. If you are worse, it advises seeing a doctor instead of continuing a remedy.</p></article>
+      <article class="card feature"><div class="ico"><svg><use href="#i-sun"/></svg></div><h3>General lifestyle education</h3><p class="muted">Sleep, activity, hydration and eating information from public-health sources, never a personal diet plan.</p></article>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="how">
+  <div class="container">
+    <div class="section-head"><h2>How it works</h2></div>
+    <ol class="steps" style="list-style:none;padding:0;margin:0">
+      <li class="step"><h3>Tell it what is wrong</h3><p class="muted">Type or speak, in any of four languages, even mixed.</p></li>
+      <li class="step"><h3>It asks what is missing</h3><p class="muted">Duration, severity and warning signs, a few short questions at most.</p></li>
+      <li class="step"><h3>Rules check the risk</h3><p class="muted">Low, medium or high, decided by transparent safety rules.</p></li>
+      <li class="step"><h3>Books are searched</h3><p class="muted">Symptom-aware retrieval finds matching records and shows their source.</p></li>
+    </ol>
+  </div>
+</section>
+
+<section class="section" id="knowledge">
+  <div class="container">
+    <div class="band">
+      <div class="grid">
+        <div>
+          <h2>A knowledge base made from real books</h2>
+          <p>The answers come from a curated dataset of <strong>5,649 records</strong> collected from Ayurvedic books and government publications, in English and Tamil, with author, book and risk label preserved exactly as collected. The records were not written by a generative AI, and the app never modifies them.</p>
+          <p>The language model only explains what was retrieved. It cannot add remedies, doses or sources that are not in the records.</p>
+        </div>
+        <div class="stack">
+          <div class="card-flat" style="background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.18)"><strong style="color:#fff">Retrieval</strong><br>Multilingual embeddings and a FAISS index compare your symptoms with the symptoms documented in each record.</div>
+          <div class="card-flat" style="background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.18)"><strong style="color:#fff">When the books are silent</strong><br>A controlled fallback may show clearly labelled information from trusted health authorities, kept separate from the books.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="section-head"><h2>Speak and listen in your language</h2><p class="muted">Voice input uses Whisper speech recognition. Replies can be read aloud with your device's voices, when your device has one for your language.</p></div>
+    <div class="lang-chips" lang="mul"><span lang="en">English</span><span lang="ta">தமிழ்</span><span lang="te">తెలుగు</span><span lang="hi">हिन्दी</span></div>
+  </div>
+</section>
+
+<section class="section" id="safety">
+  <div class="container">
+    <div class="disclaimer">
+      <h2>Please read this</h2>
+      <p>Ayurveda AI is an <strong>informational research prototype</strong>. It does not diagnose diseases, it is not a substitute for a qualified doctor, and a remedy appearing in a traditional book is <strong>not evidence that it is effective or safe for you</strong>.</p>
+      <p>If you have chest pain, trouble breathing, heavy bleeding, fainting, confusion, stroke signs or thoughts of harming yourself, call <strong>112</strong> (ambulance <strong>108</strong>) or go to the nearest hospital now.</p>
+      <a class="btn btn-primary" href="{{ url_for('pages.register') }}">I understand, get started</a>
+    </div>
+  </div>
+</section>
+{% endblock %}

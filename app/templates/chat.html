@@ -1,0 +1,31 @@
+{% extends "app_base.html" %}
+{% block title %}Consultation{% endblock %}
+{% block content %}
+<div class="chat-shell" id="chat" data-cid="{{ cid or '' }}">
+  <div class="chat-bar">
+    <span class="lang-indicator" id="lang-ind" aria-live="polite"><svg width="18" height="18"><use href="#i-globe"/></svg><span>Language: automatic</span></span>
+    <span class="grow"></span>
+    <label class="sr-only" for="lang-sel">Reply language</label>
+    <select id="lang-sel" aria-label="Reply language">
+      <option value="auto">Auto-detect</option><option value="en">English</option><option value="ta">தமிழ்</option><option value="te">తెలుగు</option><option value="hi">हिन्दी</option>
+    </select>
+    <label class="sr-only" for="rate">Speech speed</label>
+    <select id="rate" aria-label="Speech speed"><option value="0.85">Slow</option><option value="1" selected>Normal</option><option value="1.2">Fast</option></select>
+    <button class="icon-btn" id="mute" type="button" aria-pressed="false" aria-label="Mute spoken replies" title="Mute spoken replies"><svg><use href="#i-speaker"/></svg></button>
+    <button class="btn btn-ghost btn-sm" id="autospeak" type="button" aria-pressed="false">Read replies aloud: off</button>
+    <a class="btn btn-ghost btn-sm" href="{{ url_for('pages.chat') }}" id="new-chat">New</a>
+  </div>
+  <div class="chat-log" id="log" role="log" aria-live="polite" aria-label="Conversation"></div>
+  <div class="composer">
+    <div id="voice-msg" class="small muted hidden" role="status"></div>
+    <div class="composer-box">
+      <label class="sr-only" for="input">Describe how you feel</label>
+      <textarea id="input" rows="1" placeholder="Describe how you feel, in your own words..." maxlength="1500"></textarea>
+      <button class="icon-btn mic" id="mic" type="button" aria-label="Start voice recording" title="Speak"><svg><use href="#i-mic"/></svg></button>
+      <button class="icon-btn" id="send" type="button" aria-label="Send message" style="background:var(--forest-700);color:#fff;border-color:var(--forest-700)"><svg><use href="#i-send"/></svg></button>
+    </div>
+    <p class="composer-foot">Information only, not a diagnosis. In an emergency call 112 or 108.</p>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}<script type="module" src="{{ url_for('static', filename='js/chat.js') }}"></script>{% endblock %}

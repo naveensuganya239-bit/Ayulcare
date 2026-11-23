@@ -1,0 +1,15 @@
+{% extends "app_base.html" %}
+{% block title %}Home{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1 id="hello">Welcome</h1><p class="muted" style="margin:6px 0 0">What would you like to do today?</p></div>
+  <a class="btn btn-primary" href="{{ url_for('pages.chat') }}"><svg width="18" height="18"><use href="#i-plus"/></svg>New consultation</a></div>
+<div id="nudge"></div>
+<div class="grid-3">
+  <section class="card"><div class="muted small">Consultations</div><div class="stat" id="s-total">-</div></section>
+  <section class="card"><div class="muted small">Check-ins waiting</div><div class="stat" id="s-due">-</div><a class="small" href="{{ url_for('pages.feedback') }}">Open follow-ups</a></section>
+  <section class="card"><div class="muted small">Upcoming check-ins</div><div class="stat" id="s-up">-</div></section>
+</div>
+<section class="card" style="margin-top:20px"><h3>Recent consultations</h3><ul class="list" id="recent"></ul></section>
+<section class="alert alert-warn" style="margin-top:20px">If you have chest pain, trouble breathing, heavy bleeding, fainting or confusion, call <strong>112</strong> (ambulance <strong>108</strong>) now. This app is not for emergencies.</section>
+{% endblock %}
+{% block scripts %}<script type="module" src="{{ url_for('static', filename='js/dashboard.js') }}"></script>{% endblock %}

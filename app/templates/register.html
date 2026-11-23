@@ -1,0 +1,18 @@
+{% extends "market_base.html" %}
+{% block title %}Create account{% endblock %}
+{% block content %}
+<div class="auth-wrap"><div class="card auth-card">
+  <h1 style="font-size:2rem">Create your account</h1>
+  <p class="muted">Next, you will choose what health information to share. Everything beyond email is optional.</p>
+  <div id="err" class="alert alert-error hidden" role="alert"></div>
+  <form id="register-form" novalidate>
+    <div class="field"><label for="email">Email</label><input id="email" type="email" autocomplete="email" required></div>
+    <div class="field"><label for="pw">Password</label><input id="pw" type="password" autocomplete="new-password" required minlength="10" aria-describedby="pwhint">
+      <div class="pw-meter" aria-hidden="true"><i id="pwbar"></i></div><div class="hint" id="pwhint">At least 10 characters, with letters and numbers.</div></div>
+    <div class="check field"><input id="terms" type="checkbox"><label for="terms">I have read the <a href="{{ url_for('pages.privacy') }}" target="_blank" rel="noopener">Privacy Notice</a> and understand this is an informational prototype, not medical advice.</label></div>
+    <button class="btn btn-primary" style="width:100%" type="submit">Create account</button>
+  </form>
+  <p class="small muted" style="margin-top:18px">Already registered? <a href="{{ url_for('pages.login') }}">Log in</a></p>
+</div></div>
+{% endblock %}
+{% block scripts %}<script type="module" src="{{ url_for('static', filename='js/auth.js') }}"></script>{% endblock %}

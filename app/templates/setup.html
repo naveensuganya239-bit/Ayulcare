@@ -1,0 +1,15 @@
+{% extends "app_base.html" %}
+{% block title %}Set up your profile{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Set up your health profile</h1><p class="muted" style="margin:6px 0 0">Share only what you are comfortable with. You can change or delete it any time.</p></div></div>
+<div class="card" style="max-width:820px">
+  <ol class="stepper" id="stepper" aria-label="Progress"></ol>
+  <div id="err" class="alert alert-error hidden" role="alert"></div>
+  <form id="setup-form" novalidate></form>
+  <div class="row" style="margin-top:24px;justify-content:space-between">
+    <button class="btn btn-ghost" id="back" type="button">Back</button>
+    <button class="btn btn-primary" id="next" type="button">Continue</button>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}<script type="module" src="{{ url_for('static', filename='js/setup.js') }}"></script>{% endblock %}

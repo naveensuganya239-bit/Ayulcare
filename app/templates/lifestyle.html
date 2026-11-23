@@ -1,0 +1,8 @@
+{% extends "app_base.html" %}
+{% block title %}Lifestyle{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Lifestyle information</h1><p class="muted" style="margin:6px 0 0">General education based on the profile details you chose to share.</p></div></div>
+<div class="alert alert-info" id="disc"></div>
+<div class="grid-3" id="cards" style="margin-top:20px"></div>
+{% endblock %}
+{% block scripts %}<script type="module" src="{{ url_for('static', filename='js/lifestyle.js') }}"></script>{% endblock %}

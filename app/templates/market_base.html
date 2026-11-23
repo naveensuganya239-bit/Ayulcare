@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block body %}
+<header class="site-header">
+  <div class="container">
+    <a class="brand" href="{{ url_for('pages.landing') }}"><svg><use href="#i-leaf"/></svg>Ayurveda AI</a>
+    <nav class="site-nav" aria-label="Primary">
+      <a class="hide-sm" href="{{ url_for('pages.landing') }}#how">How it works</a>
+      <a class="hide-sm" href="{{ url_for('pages.landing') }}#knowledge">Knowledge base</a>
+      <a class="hide-sm" href="{{ url_for('pages.landing') }}#safety">Safety</a>
+      {% if me %}<a class="btn btn-primary btn-sm" href="{{ url_for('pages.dashboard') }}">Open app</a>
+      {% else %}<a href="{{ url_for('pages.login') }}">Log in</a><a class="btn btn-primary btn-sm" href="{{ url_for('pages.register') }}">Get started</a>{% endif %}
+    </nav>
+  </div>
+</header>
+<main id="main">{% block content %}{% endblock %}</main>
+<footer class="site-footer">
+  <div class="container">
+    <div class="cols">
+      <div><div class="brand"><svg><use href="#i-leaf"/></svg>Ayurveda AI</div>
+        <p>An informational research prototype that links everyday health questions to traditional Ayurvedic book records, with the source shown every time.</p></div>
+      <div><h4>Product</h4><p><a href="{{ url_for('pages.register') }}">Create account</a><br><a href="{{ url_for('pages.login') }}">Log in</a><br><a href="{{ url_for('pages.privacy') }}">Privacy and data</a></p></div>
+      <div><h4>In an emergency</h4><p>India: call <strong>112</strong> or ambulance <strong>108</strong>. This app cannot respond to emergencies.</p></div>
+    </div>
+    <div class="fine">Not a medical device. Not a diagnosis. Traditional remedies described here are not proven to be effective or safe for you. Always consult a qualified healthcare professional.</div>
+  </div>
+</footer>
+{% endblock %}

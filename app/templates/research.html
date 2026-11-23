@@ -1,0 +1,17 @@
+{% extends "app_base.html" %}
+{% block title %}Research dashboard{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Research evaluation dashboard</h1><p class="muted" style="margin:6px 0 0">Authorised researchers only.</p></div>
+  <div class="row"><a class="btn btn-ghost btn-sm" href="/api/research/export/feedback.csv">Export feedback CSV</a><a class="btn btn-ghost btn-sm" href="/api/research/export/retrieval.csv">Export retrieval log CSV</a></div></div>
+<div class="alert alert-warn" id="caveat"></div>
+<div id="sys" class="small muted" style="margin:12px 0"></div>
+<div class="grid-3" id="top" style="margin-top:12px"></div>
+<section class="card" style="margin-top:20px"><h3>User-reported outcomes</h3><div id="outcomes" class="stack" style="--gap:12px"></div></section>
+<div class="grid-3" style="margin-top:20px">
+  <section class="card"><h3>Satisfaction (1 to 5)</h3><div id="sat" class="stack" style="--gap:10px"></div></section>
+  <section class="card"><h3>Retrieval statistics</h3><div id="ret"></div></section>
+  <section class="card"><h3>Dataset quality</h3><div id="dq"></div></section>
+</div>
+<section class="card" style="margin-top:20px"><h3>Offline evaluation reports</h3><p class="muted small">Generated with <code>flask --app wsgi run-eval</code> from an expert-verified test set.</p><div id="reports"></div></section>
+{% endblock %}
+{% block scripts %}<script type="module" src="{{ url_for('static', filename='js/research.js') }}"></script>{% endblock %}

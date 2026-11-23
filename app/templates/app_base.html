@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% macro nav(endpoint, label, icon) %}
+  <a class="nav" href="{{ url_for(endpoint) }}" {% if request.endpoint == endpoint %}aria-current="page"{% endif %}><svg aria-hidden="true"><use href="#i-{{ icon }}"/></svg><span>{{ label }}</span></a>
+{% endmacro %}
+{% block body %}
+<div class="shell">
+  <nav class="sidebar" aria-label="Main">
+    <a class="brand" href="{{ url_for('pages.dashboard') }}"><svg><use href="#i-leaf"/></svg>Ayurveda AI</a>
+    {{ nav('pages.dashboard', 'Home', 'home') }}
+    {{ nav('pages.chat', 'Consult', 'chat') }}
+    {{ nav('pages.history', 'History', 'history') }}
+    {{ nav('pages.lifestyle', 'Lifestyle', 'sun') }}
+    {{ nav('pages.feedback', 'Follow-ups', 'check') }}
+    {{ nav('pages.settings', 'Profile', 'gear') }}
+    {% if me and me.role == 'researcher' %}{{ nav('pages.research', 'Research', 'chart') }}{% endif %}
+    <div class="spacer"></div>
+    <div class="who">{{ me.email if me }}</div>
+    <a class="nav" href="#" id="logout"><svg aria-hidden="true"><use href="#i-out"/></svg><span>Log out</span></a>
+  </nav>
+  <main class="main" id="main">{% block content %}{% endblock %}</main>
+</div>
+{% endblock %}

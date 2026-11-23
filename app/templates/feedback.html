@@ -1,0 +1,12 @@
+{% extends "app_base.html" %}
+{% block title %}Follow-ups and feedback{% endblock %}
+{% block content %}
+<div class="page-head"><h1>Follow-ups and feedback</h1></div>
+<div id="due" class="stack" style="--gap:18px"></div>
+<section class="card" style="margin-top:24px;max-width:760px">
+  <h3>Rate the last answers</h3>
+  <p class="muted small">Your rating and any reported outcome are your own report. They help the research team improve the system and are not a medical measurement. You can choose whether they are included in research statistics under Profile.</p>
+  <form id="general-form" class="stack" style="--gap:16px"></form>
+</section>
+{% endblock %}
+{% block scripts %}<script type="module" src="{{ url_for('static', filename='js/feedback.js') }}"></script>{% endblock %}
