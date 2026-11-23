@@ -115,11 +115,19 @@ def transcribe():
     lang = request.form.get("lang")
     try:
         out = svc.stt.transcribe(data, suffix, None if lang in (None, "", "auto") else lang)
-    except Exception:
+    except Exception as exc:
         current_app.logger.exception("Transcription failed")
-        return api_error("Could not transcribe that recording. Please try again or type your message.", 500)
+        err_str = str(exc)
+        # Detect the faster-whisper / PyAV incompatibility specifically
+        if "metadata_errors" in err_str or ("unexpected keyword argument" in err_str and "open" in err_str):
+            return api_error(
+                "Voice engine error (PyAV incompatibility). Using browser voice instead.",
+                503, code="stt_engine_error"
+            )
+        return api_error("Could not transcribe that recording. Please try again or type your message.", 500,
+                         code="stt_error")
     if not out["text"]:
-        return api_error("I could not hear any speech. Please try again.", 422)
+        return api_error("I could not hear any speech. Please try again.", 422, code="stt_no_speech")
     return jsonify(**out)
 
 

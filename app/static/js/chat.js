@@ -1,5 +1,5 @@
 import { $, api, h, icon, riskBadge, toast, LANG_LABEL, ApiError } from './core.js';
-import { Recorder, transcribe, speak, stopSpeaking, pauseSpeaking, resumeSpeaking, isMuted, setMuted, ttsSupported } from './voice.js';
+import { Recorder, BrowserRecognizer, transcribe, speak, stopSpeaking, pauseSpeaking, resumeSpeaking, isMuted, setMuted, ttsSupported } from './voice.js';
 
 // Small UI string table for the chat chrome (safety-critical text itself comes from the server).
 const UI = {
@@ -192,37 +192,155 @@ sendBtn.addEventListener('click', () => send(input.value));
 const vmsg = $('#voice-msg');
 const say = (t) => { vmsg.textContent = t; vmsg.classList.toggle('hidden', !t); };
 const rec = new Recorder();
+const browserRec = new BrowserRecognizer();
 let recording = false;
+let sttBackend = 'server'; // 'server' | 'browser'
+
+/** Codes returned by the server that mean "fall back to browser STT". */
+const STT_FALLBACK_CODES = new Set(['stt_unavailable', 'stt_engine_error', 'stt_error']);
 
 async function toggleMic() {
   if (busy) return;
-  if (!recording) {
+
+  if (recording) {
+    // User wants to STOP recording
+    recording = false;
+    micBtn.classList.remove('rec');
+    micBtn.setAttribute('aria-label', 'Start voice recording');
+    micBtn.firstElementChild.replaceWith(icon('mic', 20));
+
+    if (sttBackend === 'browser') {
+      browserRec.stop();
+      return;
+    }
+
+    const blob = await rec.stop();
+    if (!blob || blob.size < 800) {
+      say('The recording was too short. Please try again.');
+      return;
+    }
+    say('Transcribing…');
+    micBtn.disabled = true;
     try {
-      await rec.start(60, () => { if (recording) toggleMic(); });
-      recording = true; micBtn.classList.add('rec'); micBtn.setAttribute('aria-label', 'Stop recording'); micBtn.firstElementChild.replaceWith(icon('stop', 20));
-      say('Listening... tap the button again to stop.'); stopSpeaking();
-    } catch (e) { say(Recorder.friendlyError(e)); }
+      const r = await transcribe(blob, langSel.value);
+      say(`Heard (${LANG_LABEL[r.language] || r.language}). ${autoSend ? '' : 'Check the text, edit if needed, then send.'}`);
+      if (autoSend) {
+        await send(r.text, null, 'voice');
+      } else {
+        input.value = r.text;
+        autosize();
+        input.focus();
+      }
+    } catch (x) {
+      const code = x?.data?.code || x?.code || '';
+      if (STT_FALLBACK_CODES.has(code) && BrowserRecognizer.supported()) {
+        sttBackend = 'browser';
+        micBtn.title = 'Voice input (Browser speech recognition)';
+        say('Server voice engine error — switched to browser voice recognition. Tap mic to speak.');
+      } else {
+        say(x.message || 'Could not transcribe. Please try again or type your message.');
+      }
+    } finally {
+      micBtn.disabled = false;
+    }
     return;
   }
-  recording = false; micBtn.classList.remove('rec'); micBtn.setAttribute('aria-label', 'Start voice recording'); micBtn.firstElementChild.replaceWith(icon('mic', 20));
-  const blob = await rec.stop();
-  if (!blob || blob.size < 800) { say('The recording was too short. Please try again.'); return; }
-  say('Transcribing...'); micBtn.disabled = true;
+
+  // User wants to START recording
+  if (sttBackend === 'browser') {
+    recording = true;
+    micBtn.classList.add('rec');
+    micBtn.setAttribute('aria-label', 'Stop recording');
+    micBtn.firstElementChild.replaceWith(icon('stop', 20));
+    say('Listening… speak now. Tap the button or stop speaking when done.');
+    stopSpeaking();
+    try {
+      const r = await browserRec.start(langSel.value === 'auto' ? 'en' : langSel.value);
+      say(`Heard. ${autoSend ? '' : 'Check the text, edit if needed, then send.'}`);
+      if (autoSend) {
+        await send(r.text, null, 'voice');
+      } else {
+        input.value = r.text;
+        autosize();
+        input.focus();
+      }
+    } catch (e) {
+      say(e.message || 'Could not recognise speech. Please try again or type.');
+    } finally {
+      recording = false;
+      micBtn.classList.remove('rec');
+      micBtn.setAttribute('aria-label', 'Start voice recording');
+      micBtn.firstElementChild.replaceWith(icon('mic', 20));
+    }
+    return;
+  }
+
+  // Server STT via MediaRecorder
   try {
-    const r = await transcribe(blob, langSel.value);
-    say(`Heard (${LANG_LABEL[r.language] || r.language}). ${autoSend ? '' : 'Check the text, edit if needed, then send.'}`);
-    if (autoSend) await send(r.text, null, 'voice'); else { input.value = r.text; autosize(); input.focus(); }
-  } catch (x) { say(x.message); }
-  finally { micBtn.disabled = !voiceAvail; }
+    await rec.start(60, () => { if (recording) toggleMic(); });
+    recording = true;
+    micBtn.classList.add('rec');
+    micBtn.setAttribute('aria-label', 'Stop recording');
+    micBtn.firstElementChild.replaceWith(icon('stop', 20));
+    say('Listening… tap the button again to stop.');
+    stopSpeaking();
+  } catch (e) {
+    if (BrowserRecognizer.supported()) {
+      sttBackend = 'browser';
+      say('Microphone recording error — switched to browser speech recognition. Tap mic to try again.');
+    } else {
+      say(Recorder.friendlyError(e));
+    }
+  }
 }
+
 micBtn.addEventListener('click', toggleMic);
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && recording) { rec.cancel(); recording = false; micBtn.classList.remove('rec'); micBtn.firstElementChild.replaceWith(icon('mic', 20)); say('Recording cancelled.'); } });
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && recording) {
+    if (sttBackend === 'browser') {
+      browserRec.abort();
+    } else {
+      rec.cancel();
+    }
+    recording = false;
+    micBtn.classList.remove('rec');
+    micBtn.firstElementChild.replaceWith(icon('mic', 20));
+    say('Recording cancelled.');
+  }
+});
 
 async function initVoice() {
-  if (!Recorder.supported()) { micBtn.disabled = true; micBtn.title = 'Voice recording is not supported in this browser'; say('Voice input is not supported in this browser. You can type instead.'); return; }
-  try { voiceAvail = (await api('/api/voice/status')).available; } catch { voiceAvail = false; }
-  micBtn.disabled = !voiceAvail;
-  if (!voiceAvail) { micBtn.title = 'Voice input is not enabled on this server'; say('Voice input is not enabled on this server. You can type instead.'); }
+  const mediaSupported = Recorder.supported();
+  const browserSupported = BrowserRecognizer.supported();
+
+  if (!mediaSupported && !browserSupported) {
+    micBtn.disabled = true;
+    micBtn.title = 'Voice recording is not supported in this browser';
+    say('Voice input is not supported in this browser. You can type instead.');
+    return;
+  }
+
+  try {
+    voiceAvail = (await api('/api/voice/status')).available;
+  } catch {
+    voiceAvail = false;
+  }
+
+  if (voiceAvail && mediaSupported) {
+    sttBackend = 'server';
+    micBtn.disabled = false;
+    micBtn.title = 'Voice input (Whisper AI)';
+  } else if (browserSupported) {
+    sttBackend = 'browser';
+    voiceAvail = true;
+    micBtn.disabled = false;
+    micBtn.title = 'Voice input (Browser speech recognition)';
+  } else {
+    micBtn.disabled = true;
+    micBtn.title = 'Voice input is not enabled on this server';
+    say('Voice input is not enabled on this server. You can type instead.');
+  }
 }
 
 // ---------------------------------------------------------------- controls

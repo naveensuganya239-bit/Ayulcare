@@ -109,3 +109,97 @@ export async function transcribe(blob, lang) {
   fd.append('lang', lang || 'auto');
   return api('/api/voice/transcribe', { method: 'POST', form: fd });
 }
+
+// ------------------------------------------------------------------ Browser STT (Web Speech API fallback)
+// Used when server-side Whisper is unavailable or returns an engine error.
+const BCP_LANG = { en: 'en-IN', ta: 'ta-IN', te: 'te-IN', hi: 'hi-IN' };
+
+export const browserSttSupported = () =>
+  !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+
+export class BrowserRecognizer {
+  constructor() {
+    this.r = null;
+    this.gotResult = false;
+    this.resolve = null;
+    this.reject = null;
+    this.timer = null;
+  }
+
+  static supported() {
+    return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+  }
+
+  start(lang) {
+    return new Promise((resolve, reject) => {
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SR) return reject(new Error('Browser speech recognition is not supported.'));
+
+      this.resolve = resolve;
+      this.reject = reject;
+      this.gotResult = false;
+
+      const r = new SR();
+      this.r = r;
+      r.lang = BCP_LANG[lang] || BCP_LANG.en;
+      r.interimResults = false;
+      r.maxAlternatives = 1;
+      r.continuous = false;
+
+      r.onresult = (e) => {
+        this.gotResult = true;
+        const text = e.results[0]?.[0]?.transcript?.trim() || '';
+        if (text) {
+          this.resolve && this.resolve({ text, language: lang || 'en', source: 'browser' });
+        } else {
+          this.reject && this.reject(new Error('No speech detected. Please speak clearly.'));
+        }
+        this.resolve = null;
+        this.reject = null;
+      };
+
+      r.onerror = (e) => {
+        if (e.error === 'no-speech') {
+          this.reject && this.reject(new Error('No speech was detected. Please try again.'));
+        } else if (e.error === 'not-allowed') {
+          this.reject && this.reject(new Error('Microphone permission denied. Allow microphone access in your browser settings.'));
+        } else if (e.error === 'aborted') {
+          this.reject && this.reject(new Error('Recording cancelled.'));
+        } else {
+          this.reject && this.reject(new Error(`Speech recognition error: ${e.error}`));
+        }
+        this.resolve = null;
+        this.reject = null;
+      };
+
+      r.onend = () => {
+        clearTimeout(this.timer);
+        if (!this.gotResult && this.reject) {
+          this.reject(new Error('No speech recognised. Please speak clearly and try again.'));
+          this.resolve = null;
+          this.reject = null;
+        }
+        this.r = null;
+      };
+
+      try {
+        r.start();
+        this.timer = setTimeout(() => { this.stop(); }, 30000);
+      } catch (err) {
+        this.reject && this.reject(err);
+        this.resolve = null;
+        this.reject = null;
+      }
+    });
+  }
+
+  stop() {
+    clearTimeout(this.timer);
+    try { this.r?.stop(); } catch { /* */ }
+  }
+
+  abort() {
+    clearTimeout(this.timer);
+    try { this.r?.abort(); } catch { /* */ }
+  }
+}

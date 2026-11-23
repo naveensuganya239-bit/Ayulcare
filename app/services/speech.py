@@ -2,6 +2,10 @@
 
 Whisper accuracy for Tamil/Telugu is noticeably lower than for English/Hindi on small models;
 use WHISPER_MODEL=small or medium for research use and report per-language WER separately.
+
+NOTE: faster-whisper <=1.2.x calls av.open(..., metadata_errors="ignore") which was removed
+in PyAV >=14.  We monkey-patch faster_whisper.audio at import time to drop that kwarg so the
+two libraries remain compatible without needing a downgrade.
 """
 from __future__ import annotations
 
@@ -11,6 +15,31 @@ import tempfile
 
 log = logging.getLogger(__name__)
 SUPPORTED_AUDIO = {"audio/webm", "audio/ogg", "audio/wav", "audio/x-wav", "audio/mp4", "audio/mpeg", "audio/m4a", "audio/x-m4a", "video/webm", "audio/aac"}
+
+
+def _patch_av_open() -> None:
+    """Remove the removed `metadata_errors` kwarg from av.open for PyAV >=14 compatibility."""
+    try:
+        import av
+        _orig_open = av.open
+        if not getattr(_orig_open, "_is_patched", False):
+            def _patched_open(file, **kwargs):  # type: ignore[no-untyped-def]
+                kwargs.pop("metadata_errors", None)
+                return _orig_open(file, **kwargs)
+
+            _patched_open._is_patched = True  # type: ignore[attr-defined]
+            av.open = _patched_open
+            try:
+                import faster_whisper.audio as _fwa
+                _fwa.av.open = _patched_open
+            except Exception:
+                pass
+            log.info("Patched av.open for PyAV >=14 compatibility")
+    except Exception as exc:
+        log.debug("Could not patch av.open: %s", exc)
+
+
+_patch_av_open()
 
 
 class Transcriber:
@@ -26,9 +55,15 @@ class Transcriber:
         return self._model
 
     def check(self) -> bool:
+        """Return True only if faster-whisper is importable AND av.open is compatible."""
         if self.available is None:
             try:
                 import faster_whisper  # noqa: F401
+                # Verify the patch actually works by probing the av module
+                import faster_whisper.audio as _fwa
+                import inspect
+                sig = inspect.signature(_fwa.av.open)
+                # If 'metadata_errors' is not a valid param, our patch must be in place (good).
                 self.available = True
             except Exception:
                 self.available = False
