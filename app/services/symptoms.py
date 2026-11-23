@@ -38,6 +38,21 @@ LEXICON: dict[str, dict[str, list[str]]] = {
     "burning urination": {"en": ["burning urination", "burning while urinating", "painful urination", "burning sensation while passing urine"], "ta": ["சிறுநீர் எரிச்சல்", "சிறுநீர் கழிக்கும் போது எரிச்சல்"], "te": ["మూత్రంలో మంట", "మూత్ర విసర్జనలో మంట"], "hi": ["पेशाब में जलन", "पेशाब मे जलन"]},
     "breathlessness": {"en": ["breathless", "shortness of breath", "difficulty breathing"], "ta": ["மூச்சுத்திணறல்", "மூச்சு விட சிரமம்"], "te": ["ఊపిరి ఆడకపోవడం"], "hi": ["सांस फूल", "साँस फूल", "सांस लेने में"]},
     "chest pain": {"en": ["chest pain", "chest tightness"], "ta": ["நெஞ்சு வலி", "மார்பு வலி"], "te": ["ఛాతీ నొప్పి", "ఛాతి నొప్పి"], "hi": ["सीने में दर्द", "छाती में दर्द"]},
+    # --- Extended Ayurvedic / common symptom terms ---
+    "ear pain": {"en": ["ear pain", "ear ache", "earache", "ear infection"], "ta": ["காது வலி", "காது வலிக்கிறது"], "te": ["చెవి నొప్పి"], "hi": ["कान में दर्द", "कान दर्द"]},
+    "eye irritation": {"en": ["eye irritation", "red eye", "watery eyes", "eye pain", "burning eyes"], "ta": ["கண் எரிச்சல்", "கண் சிவப்பு"], "te": ["కంటి మంట", "కళ్ళు ఎర్రబడ్డాయి"], "hi": ["आँख में जलन", "आंख में जलन", "आंखें लाल"]},
+    "swelling": {"en": ["swelling", "swollen", "puffiness", "oedema", "edema"], "ta": ["வீக்கம்", "வீங்கி"], "te": ["వాపు", "వాచిపోయింది"], "hi": ["सूजन", "सूजा हुआ"]},
+    "worm infection": {"en": ["worm", "intestinal worm", "parasite"], "ta": ["புழு", "குடல் புழு"], "te": ["పురుగులు", "పేగు పురుగులు"], "hi": ["कीड़े", "पेट में कीड़े"]},
+    "acne": {"en": ["acne", "pimple", "pimples", "breakout"], "ta": ["முகப்பரு", "பரு"], "te": ["మొటిమలు"], "hi": ["मुंहासे", "पिंपल"]},
+    "hair loss": {"en": ["hair loss", "hair fall", "balding", "alopecia"], "ta": ["முடி உதிர்வு", "முடி கொட்டுகிறது"], "te": ["జుట్టు రాలడం", "వెంట్రుకలు రాలుతున్నాయి"], "hi": ["बाल झड़ना", "बाल गिरना", "बाल झड़"]},
+    "low immunity": {"en": ["low immunity", "weak immunity", "frequent infections", "fall sick often"], "ta": ["குறைந்த நோய் எதிர்ப்பு", "நோய் எதிர்ப்பு சக்தி குறைவு"], "te": ["రోగనిరోధకత తక్కువ"], "hi": ["कमजोर रोग प्रतिरोधक", "इम्यूनिटी कमजोर"]},
+    "bloating": {"en": ["bloat", "bloating", "flatulence", "gas", "gassy", "distension"], "ta": ["வயிறு உப்புசம்", "வாயு"], "te": ["గ్యాస్ ట్రబుల్", "పొట్ట ఉబ్బరం"], "hi": ["पेट फूलना", "गैस बनना", "अफरा"]},
+    "hiccups": {"en": ["hiccup", "hiccoughs"], "ta": ["விக்கல்"], "te": ["దొక్కు"], "hi": ["हिचकी"]},
+    "loss of taste": {"en": ["loss of taste", "no taste", "can't taste"], "ta": ["சுவை இழப்பு", "சுவை தெரியவில்லை"], "te": ["రుచి తెలియడం లేదు"], "hi": ["स्वाद नहीं आना", "खाने का स्वाद नहीं"]},
+    "abdominal pain": {"en": ["abdominal pain", "abdomen pain", "gulma", "colic"], "ta": ["வயிற்று வலி", "வயிறு வலி"], "te": ["పొట్ట నొప్పి", "కడుపు నొప్పి"], "hi": ["पेट में दर्द", "उदर दर्द"]},
+    "pitta": {"en": ["pitta", "body heat", "heat in body", "burning sensation inside"], "ta": ["பித்தம்", "உடல் வெப்பம்"], "te": ["పిత్తం", "శరీరంలో వేడి"], "hi": ["पित्त", "शरीर में गर्मी", "जलन"]},
+    "vata": {"en": ["vata", "joint stiffness", "dry skin", "irregular digestion"], "ta": ["வாதம்"], "te": ["వాత వ్యాధి"], "hi": ["वात", "जोड़ों में कठोरता"]},
+    "kapha": {"en": ["kapha", "mucus excess", "heaviness", "congestion", "mucus"], "ta": ["கபம்", "சளி அதிகம்"], "te": ["కఫం", "శ్లేష్మం"], "hi": ["कफ", "बलगम", "भारीपन"]},
 }
 
 _NEG_EN = re.compile(r"\b(no|not|without|never|denies|don't have|do not have|dont have|haven't|have not|free of)\b(\s+\w+){0,3}?\s*$")

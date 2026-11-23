@@ -22,33 +22,86 @@ log = logging.getLogger(__name__)
 
 LANG_NAME = {"en": "English", "ta": "Tamil", "te": "Telugu", "hi": "Hindi"}
 
-SYSTEM_GROUNDED = """You are the explanation layer of an informational Ayurvedic health-information research prototype.
-HARD RULES:
-1. Use ONLY the RECORDS provided. Never add remedies, ingredients, quantities, dosages, durations, contraindications or sources that are not in the records.
-2. Never diagnose. Never claim a remedy is effective, proven, safe or cures anything. Say records "describe" or "mention".
-3. Refer to records only by their ids like [R1]. Never invent ids, authors or books.
-4. Respect the RISK_LEVEL: for medium risk, encourage seeing a doctor and keep it brief; never contradict the safety note.
-5. Do not repeat the safety note verbatim; add at most one sentence on when to seek medical care.
-6. Write in {language}. Keep medical/Ayurvedic terms and numbers exactly as in the records.
-7. Output ONLY JSON: {{"summary": str, "why_matched": [{{"id": "R1", "reason": str}}], "care_note": str}}
-   - summary: 2-3 sentences, plain language, describing what the records say in relation to the reported symptoms.
-   - why_matched: one short sentence per record id explaining which reported symptom it relates to (use only the 'matched_symptoms' given).
-   - care_note: one sentence on when to seek medical care."""
+# ---------------------------------------------------------------------------
+# SYSTEM_GROUNDED — the most critical prompt: Gemini explains retrieved records
+# ---------------------------------------------------------------------------
+SYSTEM_GROUNDED = """\
+You are the Ayurvedic remedy explanation layer in a health-information research prototype.
 
-SYSTEM_EXTRACT = """You extract structured symptom information from a patient's message (any of English, Tamil, Telugu, Hindi, or mixed).
-Do NOT diagnose and do NOT give advice. Output ONLY JSON with keys:
-{"symptoms": [short English symptom terms], "negated_symptoms": [symptoms explicitly denied], "duration_days": number|null,
- "severity": "mild"|"moderate"|"severe"|null, "temperature_celsius": number|null, "worsening": boolean,
- "for_someone_else": boolean, "patient_age_years": number|null, "possible_problem_name": string|null}
-Use only what the message states. Use null when unknown."""
+HARD RULES (never break any of these):
+1. Use ONLY the RECORDS provided. Do NOT add, infer, or suggest any remedy, ingredient,
+   quantity, dosage, duration, contraindication or source that is not explicitly in the records.
+2. Never diagnose. Never claim that a remedy is effective, proven, or safe, or that it
+   cures / treats / heals anything. Use phrases like "the records describe", "the book mentions".
+3. Cite records ONLY by their given ids (R1, R2, …). Never invent ids, author names, or book titles.
+4. Respect RISK_LEVEL:
+   - low  → present remedies concisely; include a brief care note.
+   - medium → one sentence of book info only; strongly encourage seeing a doctor.
+5. Never repeat the SAFETY_NOTE word-for-word; instead add ONE sentence on when to seek care.
+6. Reply in {language}. Preserve ALL Ayurvedic / medical terms and numbers EXACTLY as in the records.
+7. Be specific: for each remedy, mention the exact preparation or action stated in the record
+   (e.g. "Take X powder with warm water twice daily" not just "use X").
+8. Keep the summary to 3–5 sentences maximum. Do not pad with generic disclaimers.
+9. Output ONLY valid JSON — no markdown, no extra text:
+   {{
+     "summary": "<3-5 sentence overview of what the records say about the reported symptoms>",
+     "why_matched": [
+       {{"id": "R1", "reason": "<one sentence: which symptom matched and how the record relates>"}}
+     ],
+     "care_note": "<one specific sentence on when / why to see a doctor for this case>"
+   }}
+"""
 
-SYSTEM_TRANSLATE = """Translate the given traditional-remedy text into {language}.
-Keep every ingredient name, number, quantity, unit and warning EXACTLY as in the source (transliterate names if needed).
-Do not add, remove or improve anything. Output ONLY the translation text."""
+# ---------------------------------------------------------------------------
+# SYSTEM_EXTRACT — symptom extraction with Ayurvedic term awareness
+# ---------------------------------------------------------------------------
+SYSTEM_EXTRACT = """\
+You extract structured symptom data from a patient message. The message may be in English,
+Tamil, Telugu, Hindi, or a mix. Recognise Ayurvedic problem names (e.g. "vata", "pitta",
+"gulma", "aruchi", "hikka") as possible_problem_name hints.
 
-SYSTEM_QUESTION = """You help a symptom-intake assistant. Given reported symptoms, write ONE short, neutral follow-up question in {language}
-that helps characterise the main symptom (e.g. dry vs productive cough, location of pain). Do not diagnose or advise.
-Do not repeat anything in ALREADY_ASKED. Output ONLY the question text."""
+Do NOT diagnose. Do NOT give advice. Output ONLY valid JSON with these exact keys:
+{{
+  "symptoms":            [<short English symptom terms, lowercase>],
+  "negated_symptoms":    [<symptoms the patient explicitly says they do NOT have>],
+  "duration_days":       <number or null>,
+  "severity":            "mild" | "moderate" | "severe" | null,
+  "temperature_celsius": <number 34-43 or null>,
+  "worsening":           true | false,
+  "for_someone_else":    true | false,
+  "patient_age_years":   <number 0-120 or null>,
+  "possible_problem_name": "<Ayurvedic or common disease name if mentioned, else null>"
+}}
+Use only information explicitly stated in the message. Use null for anything unknown.
+"""
+
+# ---------------------------------------------------------------------------
+# SYSTEM_TRANSLATE — strict translation (numbers & ingredient names preserved)
+# ---------------------------------------------------------------------------
+SYSTEM_TRANSLATE = """\
+Translate the following traditional Ayurvedic remedy text into {language}.
+Rules:
+- Keep every ingredient name, quantity, unit, number, and warning EXACTLY as in the source.
+- Transliterate Sanskrit / Ayurvedic ingredient names rather than translating them.
+- Do NOT add, omit, or reinterpret anything.
+- Output ONLY the translated text. No commentary.
+"""
+
+# ---------------------------------------------------------------------------
+# SYSTEM_QUESTION — targeted follow-up question generation
+# ---------------------------------------------------------------------------
+SYSTEM_QUESTION = """\
+You assist a symptom-intake chatbot. Given a list of reported symptoms, generate EXACTLY ONE
+short, neutral, clinically-useful follow-up question in {language} to better characterise the
+main symptom (e.g. "Is the cough dry or producing mucus?", "Where exactly is the pain?",
+"Does the rash have any blistering?").
+
+Constraints:
+- Do NOT diagnose, prescribe, or advise treatment.
+- Do NOT repeat any question already in ALREADY_ASKED.
+- Maximum 15 words in the question.
+- Output ONLY the question text — no explanation, no preamble.
+"""
 
 
 class GeminiClient:
@@ -60,7 +113,10 @@ class GeminiClient:
 
     @property
     def enabled(self) -> bool:
-        return bool(self.api_key) and self.api_key not in ("YOUR_GEMINI_API_KEY_HERE", "your-api-key-here", "")
+        key = self.api_key or ""
+        return bool(key) and key not in (
+            "YOUR_GEMINI_API_KEY_HERE", "your-api-key-here", ""
+        )
 
     def _get(self):
         if self._client is None:
@@ -68,15 +124,16 @@ class GeminiClient:
             self._client = genai.Client(api_key=self.api_key)
         return self._client
 
-    def _generate(self, system: str, user: str, json_mode: bool, max_tokens: int = 900) -> str | None:
+    def _generate(self, system: str, user: str, json_mode: bool,
+                  max_tokens: int = 900) -> str | None:
         if not self.enabled:
-            log.debug("Gemini disabled (no API key configured).")
+            log.debug("Gemini disabled (no valid API key configured).")
             return None
         try:
             from google.genai import types
             cfg = types.GenerateContentConfig(
                 system_instruction=system,
-                temperature=0.2,
+                temperature=0.1,          # lower = more precise / deterministic
                 max_output_tokens=max_tokens,
                 response_mime_type="application/json" if json_mode else "text/plain",
             )
@@ -90,25 +147,24 @@ class GeminiClient:
         except Exception as exc:
             exc_type = type(exc).__name__
             msg = str(exc)
-            # Provide actionable log messages for common issues
             if "API_KEY_INVALID" in msg or "API key not valid" in msg:
                 log.error(
-                    "Gemini API key is invalid. Get a free key at https://aistudio.google.com/apikey "
-                    "and set GEMINI_API_KEY in your .env file."
+                    "Gemini API key is INVALID. Get a free key at "
+                    "https://aistudio.google.com/apikey and set GEMINI_API_KEY in .env"
                 )
             elif "QUOTA_EXCEEDED" in msg or "quota" in msg.lower():
-                log.warning("Gemini quota exceeded. The app will fall back to deterministic templates.")
+                log.warning("Gemini quota exceeded — using deterministic fallback.")
             elif "MODEL_NOT_FOUND" in msg or "not found" in msg.lower():
                 log.error(
-                    "Gemini model '%s' not found. Try setting GEMINI_MODEL=gemini-1.5-flash in .env", self.model
+                    "Gemini model '%s' not found. "
+                    "Set GEMINI_MODEL=gemini-1.5-flash in .env", self.model
                 )
             elif "SAFETY" in msg:
-                log.warning("Gemini safety filter triggered. Using fallback template.")
+                log.warning("Gemini safety filter — using fallback.")
             else:
                 log.warning("Gemini call failed (%s): %s", exc_type, msg[:200])
-            # Reset client on connection errors so the next call retries
             if exc_type in ("ConnectTimeout", "ReadTimeout", "ConnectionError"):
-                self._client = None
+                self._client = None   # force reconnect next call
             return None
 
     @staticmethod
@@ -124,78 +180,132 @@ class GeminiClient:
                 try:
                     return json.loads(m.group(0))
                 except json.JSONDecodeError:
-                    return None
+                    pass
         return None
 
     # ------------------------------------------------------------------ API
     def extract(self, text: str, ctx_summary: str = "") -> dict | None:
-        data = self._json(self._generate(SYSTEM_EXTRACT, f"KNOWN_SO_FAR: {ctx_summary}\nMESSAGE: {text}", True, 400))
+        prompt = (
+            f"KNOWN_SYMPTOMS_SO_FAR: {ctx_summary}\n"
+            f"NEW_PATIENT_MESSAGE: {text}"
+        )
+        data = self._json(self._generate(SYSTEM_EXTRACT, prompt, True, 500))
         if not isinstance(data, dict):
             return None
-        out = {
-            "symptoms": [str(s).strip().lower()[:60] for s in data.get("symptoms", []) if isinstance(s, str) and s.strip()][:10],
-            "negated": [str(s).strip().lower()[:60] for s in data.get("negated_symptoms", []) if isinstance(s, str)][:10],
-            "duration_days": data.get("duration_days") if isinstance(data.get("duration_days"), (int, float)) else None,
-            "severity": data.get("severity") if data.get("severity") in ("mild", "moderate", "severe") else None,
-            "fever_c": data.get("temperature_celsius") if isinstance(data.get("temperature_celsius"), (int, float)) and 34 <= data["temperature_celsius"] <= 43 else None,
+        return {
+            "symptoms": [
+                str(s).strip().lower()[:60]
+                for s in data.get("symptoms", [])
+                if isinstance(s, str) and s.strip()
+            ][:10],
+            "negated": [
+                str(s).strip().lower()[:60]
+                for s in data.get("negated_symptoms", [])
+                if isinstance(s, str)
+            ][:10],
+            "duration_days": (
+                data.get("duration_days")
+                if isinstance(data.get("duration_days"), (int, float))
+                else None
+            ),
+            "severity": (
+                data.get("severity")
+                if data.get("severity") in ("mild", "moderate", "severe")
+                else None
+            ),
+            "fever_c": (
+                data.get("temperature_celsius")
+                if isinstance(data.get("temperature_celsius"), (int, float))
+                and 34 <= data["temperature_celsius"] <= 43
+                else None
+            ),
             "worsening": bool(data.get("worsening")),
             "other_subject": bool(data.get("for_someone_else")),
-            "patient_age_years": data.get("patient_age_years") if isinstance(data.get("patient_age_years"), (int, float)) and 0 <= data["patient_age_years"] <= 120 else None,
-            "problem_hint": (data.get("possible_problem_name") or None),
+            "patient_age_years": (
+                data.get("patient_age_years")
+                if isinstance(data.get("patient_age_years"), (int, float))
+                and 0 <= data["patient_age_years"] <= 120
+                else None
+            ),
+            "problem_hint": data.get("possible_problem_name") or None,
         }
-        return out
 
-    def clarifying_question(self, symptoms: list[str], language: str, already_asked: list[str]) -> str | None:
+    def clarifying_question(self, symptoms: list[str], language: str,
+                             already_asked: list[str]) -> str | None:
+        prompt = (
+            f"REPORTED_SYMPTOMS: {', '.join(symptoms)}\n"
+            f"ALREADY_ASKED: {json.dumps(already_asked)}"
+        )
         raw = self._generate(
             SYSTEM_QUESTION.format(language=LANG_NAME.get(language, "English")),
-            f"SYMPTOMS: {', '.join(symptoms)}\nALREADY_ASKED: {already_asked}",
-            False, 120,
+            prompt, False, 80,
         )
-        if raw and len(raw) < 220 and "?" in raw or (raw and raw.endswith(("?", "？"))):
-            return raw
+        if raw and len(raw) < 180 and ("?" in raw or raw.endswith(("?", "？"))):
+            return raw.strip()
         return None
 
-    def explain(self, records: list[dict], risk_level: str, symptoms: list[str], language: str,
-                safety_note: str, context: dict) -> dict | None:
+    def explain(self, records: list[dict], risk_level: str, symptoms: list[str],
+                language: str, safety_note: str, context: dict) -> dict | None:
         payload = {
-            "RISK_LEVEL": risk_level, "SAFETY_NOTE": safety_note, "REPORTED_SYMPTOMS": symptoms,
+            "RISK_LEVEL": risk_level,
+            "SAFETY_NOTE": safety_note,
+            "REPORTED_SYMPTOMS": symptoms,
             "USER_CONTEXT_(de-identified)": context,
-            "RECORDS": [{"id": r["ref"], "problem": r["problem_en"], "symptom": r["symptom_en"],
-                         "remedy": r["remedy_en"], "author": r["author"], "book": r["book"],
-                         "matched_symptoms": r.get("matched_symptoms", [])} for r in records],
+            "RECORDS": [
+                {
+                    "id": r["ref"],
+                    "problem": r["problem_en"],
+                    "symptom": r["symptom_en"],
+                    "remedy": r["remedy_en"],
+                    "author": r["author"],
+                    "book": r["book"],
+                    "matched_symptoms": r.get("matched_symptoms", []),
+                }
+                for r in records
+            ],
         }
         data = self._json(self._generate(
             SYSTEM_GROUNDED.format(language=LANG_NAME.get(language, "English")),
             json.dumps(payload, ensure_ascii=False),
-            True, 900,
+            True, 1200,
         ))
         return data if isinstance(data, dict) else None
 
     def translate_remedy(self, text: str, language: str) -> str | None:
         return self._generate(
             SYSTEM_TRANSLATE.format(language=LANG_NAME.get(language, "English")),
-            text, False, 400,
+            text, False, 500,
         )
 
-    def summarise_external(self, results: list[dict], language: str, symptoms: list[str]) -> str | None:
+    def summarise_external(self, results: list[dict], language: str,
+                            symptoms: list[str]) -> str | None:
         system = (
-            "Summarise the provided SNIPPETS from trusted health websites in " + LANG_NAME.get(language, "English") +
-            ". Use ONLY the snippets. NO dosages, NO prescriptions, NO treatment instructions, NO diagnosis. "
-            "2-3 sentences of general education. Mention that this is external information. Output plain text only."
+            "Summarise the provided SNIPPETS from trusted health websites in "
+            + LANG_NAME.get(language, "English")
+            + ". Use ONLY the snippets. No dosages, no prescriptions, no treatment "
+            "instructions, no diagnosis. 2–3 sentences of general education only. "
+            "Mention that this is external information. Output plain text only."
         )
-        return self._generate(
-            system,
-            json.dumps({"symptoms": symptoms, "SNIPPETS": [
-                {"source": r["source"], "title": r["title"], "snippet": r["snippet"]} for r in results
-            ]}, ensure_ascii=False),
-            False, 400,
+        payload = json.dumps(
+            {
+                "reported_symptoms": symptoms,
+                "SNIPPETS": [
+                    {"source": r["source"], "title": r["title"], "snippet": r["snippet"]}
+                    for r in results
+                ],
+            },
+            ensure_ascii=False,
         )
+        return self._generate(system, payload, False, 500)
 
 
 # ------------------------------------------------------------ output guards
 _NUM = re.compile(r"\d+(?:[.,]\d+)?")
 _ALLOWED_NUMS = {"108", "112", "14416", "1", "2", "3", "7", "14", "24", "48", "72"}
-_INDIC_DIGITS = str.maketrans("௦௧௨௩௪௫௬௭௮௯౦౧౨౩౪౫౬౭౮౯०१२३४५६७८९", "01234567890123456789" + "0123456789")
+_INDIC_DIGITS = str.maketrans(
+    "௦௧௨௩௪௫௬௭௮௯౦౧౨౩౪౫౬౭౮౯०१२३४५६७८९",
+    "01234567890123456789" + "0123456789",
+)
 
 
 def numbers_in(text: str) -> list[str]:
@@ -207,14 +317,16 @@ def numbers_preserved(source: str, translation: str) -> bool:
     return sorted(numbers_in(source)) == sorted(numbers_in(translation))
 
 
-def validate_explanation(data: dict | None, refs: set[str], records_text: str, user_text: str) -> dict | None:
-    """Reject LLM output that cites unknown records or introduces numbers (e.g. doses)
-    that appear neither in the retrieved records nor in the user's own message."""
+def validate_explanation(data: dict | None, refs: set[str],
+                          records_text: str, user_text: str) -> dict | None:
+    """Reject LLM output that cites unknown records or introduces hallucinated numbers."""
     if not data or not isinstance(data.get("summary"), str):
         return None
     allowed = set(numbers_in(records_text)) | set(numbers_in(user_text)) | _ALLOWED_NUMS
-    blob = " ".join([data.get("summary", ""), data.get("care_note", "") or ""] +
-                    [str(w.get("reason", "")) for w in data.get("why_matched", []) if isinstance(w, dict)])
+    blob = " ".join(
+        [data.get("summary", ""), data.get("care_note", "") or ""]
+        + [str(w.get("reason", "")) for w in data.get("why_matched", []) if isinstance(w, dict)]
+    )
     if any(n not in allowed for n in numbers_in(blob)):
         return None
     cited = set(re.findall(r"\[?(R\d+)\]?", blob))

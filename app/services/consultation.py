@@ -235,8 +235,8 @@ class ConsultationEngine:
         conditions = profile_condition_keys((profile.chronic_conditions or "") if (for_self and profile) else "", age,
                                             bool(for_self and profile and profile.pregnant))
         cum = " ".join(st["texts"])
-        query = Query(symptoms=list(sl["symptoms"]), text=cum[-400:], problem_hint=sl.get("problem_hint"), lang=lang, conditions=conditions)
-        res = self.svc.retriever.search(query, "proposed", k=8)
+        query = Query(symptoms=list(sl["symptoms"]), text=cum[-600:], problem_hint=sl.get("problem_hint"), lang=lang, conditions=conditions)
+        res = self.svc.retriever.search(query, "proposed", k=10)
         items = [i for i in res.items if i["record_id"] not in st["shown_ids"]]
         if risk.level == "medium":
             items = items[:2]
@@ -316,14 +316,25 @@ class ConsultationEngine:
         problems = list(dict.fromkeys(r["problem_en"] for r in remedies))
         prob_str = " and ".join(problems[:2])
         refs = ", ".join(r["ref"] for r in remedies)
+        # Pull the first concrete remedy text to make the summary specific
+        first_remedy = remedies[0]["remedy_en"] if remedies else ""
         summary = (
-            f"The Ayurvedic books describe records related to {prob_str}. "
-            f"The retrieved entries ({refs}) mention traditional remedies documented in Ayurvedic texts. "
-            f"Please review each remedy card below for the specific details."
+            f"The Ayurvedic books contain records for {prob_str}. "
+            f"For example, [{remedies[0]['ref']}] describes: \"{first_remedy[:120]}{'…' if len(first_remedy) > 120 else ''}\" "
+            f"See all {len(remedies)} remedy card(s) below ({refs}) for the full documented preparations."
         )
-        care_note = "If your symptoms are severe, persistent, or worsening, please consult a qualified doctor."
+        care_note = (
+            "If symptoms worsen, persist beyond a few days, or are severe, "
+            "consult a qualified doctor or AYUSH practitioner promptly."
+        )
         why_matched = [
-            {"id": r["ref"], "reason": f"Matched for: {', '.join(r.get('matched_symptoms', []) or [r['symptom_en']][:1])}"}
+            {
+                "id": r["ref"],
+                "reason": (
+                    f"Matched symptom(s): {', '.join(r.get('matched_symptoms', []) or [r['symptom_en']][:1])} "
+                    f"→ {r['problem_en']}"
+                ),
+            }
             for r in remedies
         ]
         return {"summary": summary, "why_matched": why_matched, "care_note": care_note}

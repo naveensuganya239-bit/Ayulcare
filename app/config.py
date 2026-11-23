@@ -76,11 +76,11 @@ class Config:
     RETRIEVAL_MIN_FULL_SIM = _float("RETRIEVAL_MIN_FULL_SIM")
     # Ranking weights. These are engineering hyper-parameters to be tuned on a
     # development split -- they are NOT clinically derived.
-    RANK_WEIGHTS = {"symptom": 0.45, "coverage": 0.20, "full": 0.25, "problem": 0.10}
-    RETRIEVAL_CANDIDATES = 150
-    MAX_PROBLEM_GROUPS = 3
+    RANK_WEIGHTS = {"symptom": 0.50, "coverage": 0.20, "full": 0.22, "problem": 0.08}
+    RETRIEVAL_CANDIDATES = 200
+    MAX_PROBLEM_GROUPS = 4
     MAX_REMEDIES_PER_GROUP = 3
-    GROUP_SCORE_DELTA = 0.06
+    GROUP_SCORE_DELTA = 0.05
     EXCLUDE_DATASET_HIGH = True  # dataset "High" labels are never shown as home remedies
 
     # Gemini
@@ -99,7 +99,7 @@ class Config:
     WHISPER_COMPUTE_TYPE = os.getenv("WHISPER_COMPUTE_TYPE", "int8")
 
     # Consultation behaviour
-    MAX_FOLLOWUP_QUESTIONS = 4
+    MAX_FOLLOWUP_QUESTIONS = 3   # reduced from 4 for faster remedy delivery
     MAX_MESSAGE_CHARS = 1500
     FOLLOWUP_HOURS_LOW = int(os.getenv("FOLLOWUP_HOURS_LOW", "48"))
     FOLLOWUP_HOURS_MEDIUM = int(os.getenv("FOLLOWUP_HOURS_MEDIUM", "24"))
