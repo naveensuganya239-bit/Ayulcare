@@ -87,7 +87,7 @@ class Config:
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
     # gemini-1.5-flash is free-tier on Google AI Studio; gemini-2.5-flash requires billing
     GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
-    GEMINI_TIMEOUT = 30
+    GEMINI_TIMEOUT = int(os.getenv("GEMINI_TIMEOUT", "10"))
 
     # Web search fallback
     GOOGLE_CSE_API_KEY = os.getenv("GOOGLE_CSE_API_KEY", "").strip()

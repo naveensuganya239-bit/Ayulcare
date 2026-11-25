@@ -1,4 +1,4 @@
-// Voice helpers: browser Speech Synthesis (output) and MediaRecorder -> server Whisper (input).
+// Voice helpers: local browser/server speech output and MediaRecorder -> server Whisper (input).
 import { api } from './core.js';
 
 const BCP = { en: 'en-IN', ta: 'ta-IN', te: 'te-IN', hi: 'hi-IN' };
@@ -8,7 +8,8 @@ let current = null; // {onend}
 export const isMuted = () => muted;
 export function setMuted(v) { muted = v; localStorage.setItem('tts-muted', v ? '1' : '0'); if (v) stopSpeaking(); }
 
-export const ttsSupported = () => 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
+const browserTtsSupported = () => 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
+export const ttsSupported = () => typeof Audio !== 'undefined';
 
 function loadVoices() {
   return new Promise((resolve) => {
@@ -20,11 +21,21 @@ function loadVoices() {
 }
 
 export async function pickVoice(lang) {
-  if (!ttsSupported()) return null;
+  if (!browserTtsSupported()) return null;
   const voices = await loadVoices();
   const want = BCP[lang] || lang;
-  return voices.find((v) => v.lang.replace('_', '-').toLowerCase() === want.toLowerCase())
-    || voices.find((v) => v.lang.toLowerCase().startsWith(lang)) || null;
+  const matches = voices.filter((v) => {
+    const voiceLang = v.lang.replace('_', '-').toLowerCase();
+    return voiceLang === want.toLowerCase() || voiceLang.startsWith(lang);
+  });
+
+  const femaleName = /(female|woman|zira|samantha|victoria|karen|moira|tessa|veena|heera|sunhi|susan|linda|hazel|salli|joanna|kimberly|ivy|kendra|amy|emma|alice|natasha|nina|aria)/i;
+  const maleName = /(\bmale\b|david|mark|ravi|guy|james|daniel|alex|george|thomas|prabhat|hemant)/i;
+
+  return matches.find((v) => femaleName.test(v.name))
+    || matches.find((v) => !maleName.test(v.name))
+    || matches[0]
+    || null;
 }
 
 function chunks(text, max = 180) {
@@ -39,12 +50,47 @@ function chunks(text, max = 180) {
 }
 
 /** Speak text. Returns {ok, reason}. reason: 'unsupported' | 'muted' | 'no-voice'. */
-export async function speak(text, lang, rate = 1, { onstart, onend } = {}) {
-  if (!ttsSupported()) return { ok: false, reason: 'unsupported' };
+export async function speak(text, lang, rate = 1, { onstart, onend, onerror } = {}) {
   if (muted) return { ok: false, reason: 'muted' };
+  stopSpeaking();
+  if (lang !== 'en') {
+    const token = { audio: null, url: null };
+    current = token;
+    try {
+      const blob = await api('/api/voice/synthesize', {
+        method: 'POST',
+        body: { text, language: lang },
+        responseType: 'blob',
+      });
+      if (current !== token) return { ok: false, reason: 'cancelled' };
+
+      token.url = URL.createObjectURL(blob);
+      token.audio = new Audio(token.url);
+      token.audio.playbackRate = rate;
+      const finish = (error = false) => {
+        if (current !== token) return;
+        current = null;
+        URL.revokeObjectURL(token.url);
+        if (error) { onerror && onerror(); return; }
+        onend && onend();
+      };
+      token.audio.onended = () => finish();
+      token.audio.onerror = () => finish(true);
+      await token.audio.play();
+      if (current !== token) return { ok: false, reason: 'cancelled' };
+      onstart && onstart();
+      return { ok: true };
+    } catch (error) {
+      if (current === token) {
+        current = null;
+        if (token.url) URL.revokeObjectURL(token.url);
+      }
+      throw error;
+    }
+  }
+  if (!browserTtsSupported()) return { ok: false, reason: 'unsupported' };
   const voice = await pickVoice(lang);
   if (!voice) return { ok: false, reason: 'no-voice' };
-  stopSpeaking();
   const parts = chunks(text);
   let i = 0;
   const token = {};
@@ -53,7 +99,7 @@ export async function speak(text, lang, rate = 1, { onstart, onend } = {}) {
     if (current !== token) return;
     if (i >= parts.length) { current = null; onend && onend(); return; }
     const u = new SpeechSynthesisUtterance(parts[i++]);
-    u.voice = voice; u.lang = voice.lang; u.rate = rate;
+    u.voice = voice; u.lang = voice.lang; u.rate = rate; u.pitch = 1.08;
     u.onend = next; u.onerror = () => { if (current === token) { current = null; onend && onend(); } };
     speechSynthesis.speak(u);
   };
@@ -61,9 +107,22 @@ export async function speak(text, lang, rate = 1, { onstart, onend } = {}) {
   next();
   return { ok: true };
 }
-export function pauseSpeaking() { if (ttsSupported()) speechSynthesis.pause(); }
-export function resumeSpeaking() { if (ttsSupported()) speechSynthesis.resume(); }
-export function stopSpeaking() { current = null; if (ttsSupported()) speechSynthesis.cancel(); }
+export function pauseSpeaking() {
+  if (current?.audio) current.audio.pause();
+  else if (browserTtsSupported()) speechSynthesis.pause();
+}
+export function resumeSpeaking() {
+  if (current?.audio) {
+    current.audio.play().catch((error) => console.error('Could not resume spoken reply.', error));
+  } else if (browserTtsSupported()) speechSynthesis.resume();
+}
+export function stopSpeaking() {
+  const token = current;
+  current = null;
+  if (token?.audio) { token.audio.pause(); token.audio.currentTime = 0; }
+  if (token?.url) URL.revokeObjectURL(token.url);
+  if (browserTtsSupported()) speechSynthesis.cancel();
+}
 window.addEventListener('beforeunload', stopSpeaking);
 
 // ------------------------------------------------------------------ recording

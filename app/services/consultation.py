@@ -56,7 +56,6 @@ class ConsultationEngine:
 
     def handle(self, user, consult: Consultation, text: str, manual_lang: str | None = None,
                input_mode: str = "text") -> list[dict]:
-        self.svc.ensure_ready()
         st = consult.state or new_state()
         profile = user.profile
         prof_lang = profile.preferred_language if profile and profile.preferred_language not in (None, "auto") else None
@@ -87,7 +86,37 @@ class ConsultationEngine:
     # ============================================================ extraction
     def _extract(self, text: str, st: dict, profile) -> Extraction:
         ext = extract_rule_based(text)
-        if self.svc.gemini.enabled:
+        red_flags, _ = detect_red_flags("\n".join(st.get("texts", [])))
+        pending = st.get("pending")
+        simple_followup = (
+            not ext.symptoms
+            and not ext.negated
+            and ext.fever_c is None
+            and not ext.worsening
+            and not ext.other_subject
+            and ext.patient_age_years is None
+            and (
+                (
+                    pending == "warning"
+                    and ext.yes_no is not None
+                    and ext.duration_days is None
+                    and ext.severity is None
+                )
+                or (
+                    pending == "duration"
+                    and ext.duration_days is not None
+                    and ext.yes_no is None
+                    and ext.severity is None
+                )
+                or (
+                    pending == "severity"
+                    and ext.severity is not None
+                    and ext.yes_no is None
+                    and ext.duration_days is None
+                )
+            )
+        )
+        if self.svc.gemini.enabled and not red_flags and not simple_followup:
             names = [profile.name] if profile and profile.name else []
             known = ", ".join(st["slots"]["symptoms"])
             g = self.svc.gemini.extract(scrub(text, names), known)
@@ -236,6 +265,7 @@ class ConsultationEngine:
                                             bool(for_self and profile and profile.pregnant))
         cum = " ".join(st["texts"])
         query = Query(symptoms=list(sl["symptoms"]), text=cum[-600:], problem_hint=sl.get("problem_hint"), lang=lang, conditions=conditions)
+        self.svc.ensure_ready()
         res = self.svc.retriever.search(query, "proposed", k=10)
         items = [i for i in res.items if i["record_id"] not in st["shown_ids"]]
         if risk.level == "medium":
@@ -280,18 +310,28 @@ class ConsultationEngine:
 
     # --------------------------------------------------------------- helpers
     def _cards(self, items: list[dict], lang: str) -> list[dict]:
-        ds, cards = self.svc.ds, []
-        for n, it in enumerate(items, 1):
-            rec = ds.get(it["record_id"])
-            pub = ds.public(rec)
+        ds = self.svc.ds
+        records = [
+            (item, ds.public(ds.get(item["record_id"])))
+            for item in items
+        ]
+        translations = (
+            self.svc.gemini.translate_remedies(
+                [pub["remedy_en"] for _, pub in records],
+                lang,
+            )
+            if lang in ("te", "hi") and self.svc.gemini.enabled
+            else [None] * len(records)
+        )
+        cards = []
+        for n, (it, pub) in enumerate(records, 1):
             card = {**pub, "ref": f"R{n}", "matched_symptoms": it["matched_symptoms"],
                     "matched_labels": [symptom_label(s, lang) for s in it["matched_symptoms"]],
                     "rank_score": it["score"], "precautions_in_text": it.get("precautions_in_text", []),
                     "translation": None, "translation_note": None}
-            if lang in ("te", "hi") and self.svc.gemini.enabled:
-                tr = self.svc.gemini.translate_remedy(pub["remedy_en"], lang)
-                if tr and numbers_preserved(pub["remedy_en"], tr):
-                    card["translation"], card["translation_note"] = tr, "AI translation - verify against the original text"
+            tr = translations[n - 1]
+            if tr:
+                card["translation"], card["translation_note"] = tr, "AI translation - verify against the original text"
             cards.append(card)
         return cards
 

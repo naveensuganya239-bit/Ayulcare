@@ -1,8 +1,11 @@
+
 # Ayurveda AI - multilingual, grounded Ayurvedic health-information assistant
 
 Informational **research prototype** (IEEE paper project). It does not diagnose, does not replace a doctor, and does not claim any traditional remedy is effective.
 
-**Stack:** Flask REST API - SQLite (dev) / PostgreSQL (cloud) - pandas - Sentence-Transformers (`intfloat/multilingual-e5-small`) - FAISS - Google Gemini (server-side only) - Whisper (faster-whisper) - browser Speech Synthesis - vanilla HTML/CSS/JS.
+**Stack:** Flask REST API - SQLite (dev) / PostgreSQL (cloud) - pandas - Sentence-Transformers (`intfloat/multilingual-e5-small`) - FAISS - Google Gemini (server-side only) - Whisper (faster-whisper) - browser speech (English) and local MMS speech synthesis (Tamil, Telugu, Hindi) - vanilla HTML/CSS/JS.
+
+Tamil, Telugu, and Hindi spoken replies use Meta's [MMS TTS Tamil](https://huggingface.co/facebook/mms-tts-tam), [Telugu](https://huggingface.co/facebook/mms-tts-tel), and [Hindi](https://huggingface.co/facebook/mms-tts-hin) models locally. Each language model is downloaded and cached on first use; chat text is not sent to a speech provider. The models are licensed CC BY-NC 4.0, so review the license before commercial use.
 
 ## Pipeline
 ```

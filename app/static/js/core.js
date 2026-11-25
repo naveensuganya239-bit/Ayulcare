@@ -8,7 +8,7 @@ export class ApiError extends Error {
   constructor(message, status, data) { super(message); this.status = status; this.data = data; }
 }
 
-export async function api(path, { method = 'GET', body, form } = {}) {
+export async function api(path, { method = 'GET', body, form, responseType } = {}) {
   const headers = { 'X-CSRF-Token': csrf };
   const opts = { method, headers, credentials: 'same-origin' };
   if (form) opts.body = form;
@@ -17,7 +17,9 @@ export async function api(path, { method = 'GET', body, form } = {}) {
   try { res = await fetch(path, opts); }
   catch { throw new ApiError('Network problem. Please check your connection and try again.', 0); }
   let data = null;
-  try { data = await res.json(); } catch { /* non-JSON */ }
+  if (responseType !== 'blob' || !res.ok) {
+    try { data = await res.json(); } catch { /* non-JSON */ }
+  }
   if (data && data.csrf) csrf = data.csrf;
   if (!res.ok) {
     if (res.status === 401 && !location.pathname.startsWith('/login') && !location.pathname.startsWith('/register')) {
@@ -25,6 +27,7 @@ export async function api(path, { method = 'GET', body, form } = {}) {
     }
     throw new ApiError((data && data.error) || 'Something went wrong.', res.status, data);
   }
+  if (responseType === 'blob') return res.blob();
   return data;
 }
 

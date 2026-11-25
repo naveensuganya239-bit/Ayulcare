@@ -17,3 +17,4 @@ faiss-cpu>=1.8
 # --- AI / Speech ---
 google-genai>=1.0         # Google Gemini API (server-side only)
 faster-whisper>=1.0       # Whisper speech-to-text (CTranslate2 runtime)
+transformers>=4.45        # Local MMS text-to-speech models

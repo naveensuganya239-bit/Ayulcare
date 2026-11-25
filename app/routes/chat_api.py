@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-from flask import Blueprint, current_app, jsonify, request
+from flask import Blueprint, Response, current_app, jsonify, request
 
 from ..extensions import db, limiter
 from ..i18n_strings import t
@@ -129,6 +129,37 @@ def transcribe():
     if not out["text"]:
         return api_error("I could not hear any speech. Please try again.", 422, code="stt_no_speech")
     return jsonify(**out)
+
+
+@bp.post("/voice/synthesize")
+@consent_required_api
+@limiter.limit("12 per minute; 120 per hour")
+def synthesize_voice():
+    d = request.get_json(silent=True) or {}
+    text = clean_str(d.get("text"), 6001, allow_empty=False)
+    if not text:
+        return api_error("Speech text is required.")
+    if len(text) > 6000:
+        return api_error("Speech text is too long.")
+    language = d.get("language")
+    if language not in ("ta", "te", "hi"):
+        return api_error("On-device speech is available for Tamil, Telugu, and Hindi only.")
+
+    try:
+        audio = current_app.extensions["svc"].tts.synthesize(text, language)
+    except Exception:
+        current_app.logger.exception("On-device speech synthesis failed")
+        return api_error(
+            "Could not prepare the on-device voice. Please retry or use text.",
+            503,
+            code="tts_unavailable",
+        )
+
+    return Response(
+        audio,
+        mimetype="audio/wav",
+        headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"},
+    )
 
 
 # ------------------------------------------------------------- follow-ups

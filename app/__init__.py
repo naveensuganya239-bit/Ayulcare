@@ -4,6 +4,7 @@ from __future__ import annotations
 import logging
 import os
 import sys
+import threading
 
 from flask import Flask, jsonify, render_template, request
 
@@ -70,4 +71,10 @@ def create_app(config_name: str | None = None) -> Flask:
 
     from .cli import register_cli
     register_cli(app)
+    if not app.config["TESTING"]:
+        threading.Thread(
+            target=svc.ensure_ready,
+            name="ayulcare-service-warmup",
+            daemon=True,
+        ).start()
     return app

@@ -1,3 +1,6 @@
+import pytest
+
+
 def test_csrf_enforced(client):
     r = client.post("/api/auth/login", json={"email": "a@b.co", "password": "x"})
     assert r.status_code == 403
@@ -13,11 +16,48 @@ def test_chat_requires_consent(api):
     assert api.post("/api/chat/start").status_code == 403
 
 
-def test_emergency_flow_no_remedies(user):
+def test_emergency_flow_no_remedies(user, monkeypatch):
+    gemini = user.c.application.extensions["svc"].gemini
+    monkeypatch.setattr(gemini, "api_key", "test-key")
+    monkeypatch.setattr(gemini, "extract", lambda *args: pytest.fail("red flags must bypass Gemini"))
     cid = user.post("/api/chat/start").get_json()["id"]
     r = user.post(f"/api/chat/{cid}/message", {"text": "I have severe chest pain and difficulty breathing"}).get_json()
     p = r["replies"][0]["payload"]
     assert p["type"] == "emergency" and r["risk_level"] == "high" and "remedies" not in p
+
+
+def test_followup_does_not_initialize_retrieval(user, monkeypatch):
+    svc = user.c.application.extensions["svc"]
+    monkeypatch.setattr(svc, "ensure_ready", lambda: pytest.fail("retrieval should not load for follow-up"))
+    cid = user.post("/api/chat/start").get_json()["id"]
+
+    r = user.post(f"/api/chat/{cid}/message", {"text": "I have a cough"}).get_json()
+
+    assert r["replies"][0]["payload"]["type"] == "followup"
+
+
+def test_voice_synthesis_returns_local_audio(user, monkeypatch):
+    svc = user.c.application.extensions["svc"]
+    monkeypatch.setattr(svc.tts, "synthesize", lambda text, language: b"RIFF-audio")
+
+    r = user.post(
+        "/api/voice/synthesize",
+        {"text": "வணக்கம்", "language": "ta"},
+    )
+
+    assert r.status_code == 200
+    assert r.mimetype == "audio/wav"
+    assert r.headers["Cache-Control"] == "no-store"
+    assert r.data == b"RIFF-audio"
+
+
+def test_voice_synthesis_rejects_unsupported_language(user):
+    r = user.post(
+        "/api/voice/synthesize",
+        {"text": "hello", "language": "en"},
+    )
+
+    assert r.status_code == 400
 
 
 def test_followup_then_assessment_with_sources(user):

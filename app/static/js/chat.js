@@ -16,6 +16,8 @@ const UI = {
   pause: { en: 'Pause', ta: 'இடைநிறுத்து', te: 'పాజ్', hi: 'रोकें' },
   stop: { en: 'Stop', ta: 'நிறுத்து', te: 'ఆపు', hi: 'बंद' },
   no_voice: { en: 'This device has no voice for this language. The answer is shown as text.', ta: 'இந்த சாதனத்தில் இந்த மொழிக்கான குரல் இல்லை. பதில் உரையாகக் காட்டப்படுகிறது.', te: 'ఈ పరికరంలో ఈ భాషకు వాయిస్ లేదు. సమాధానం టెక్స్ట్‌గా చూపబడుతోంది.', hi: 'इस डिवाइस पर इस भाषा की आवाज़ नहीं है। उत्तर टेक्स्ट में दिखाया गया है।' },
+  voice_loading: { en: 'Preparing voice…', ta: 'குரலைத் தயாரிக்கிறது… முதல் முறையில் குரல் மாதிரி பதிவிறக்கப்படலாம்.', te: 'వాయిస్ సిద్ధం చేస్తోంది… మొదటిసారి వాయిస్ మోడల్ డౌన్‌లోడ్ కావచ్చు.', hi: 'आवाज़ तैयार हो रही है… पहली बार वॉइस मॉडल डाउनलोड हो सकता है।' },
+  voice_error: { en: 'Could not prepare the on-device voice. Please retry.', ta: 'சாதனத்தில் குரலைத் தயாரிக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்.', te: 'ఈ పరికరంలో వాయిస్ సిద్ధం కాలేదు. మళ్లీ ప్రయత్నించండి.', hi: 'इस डिवाइस पर आवाज़ तैयार नहीं हो सकी। फिर कोशिश करें।' },
   call: { en: 'Call', ta: 'அழை', te: 'కాల్', hi: 'कॉल' },
   translation: { en: 'AI translation', ta: 'AI மொழிபெயர்ப்பு', te: 'AI అనువాదం', hi: 'AI अनुवाद' },
 };
@@ -82,11 +84,19 @@ function audioRow(getText, lang) {
   let paused = false;
   const reset = () => { play.classList.remove('hidden'); pause.classList.add('hidden'); stop.classList.add('hidden'); paused = false; };
   const start = async () => {
-    note.textContent = '';
     if (isMuted()) { toast('Spoken replies are muted. Unmute to listen.'); return; }
-    const r = await speak(getText(), lang, Number($('#rate').value), {
-      onstart: () => { play.classList.add('hidden'); pause.classList.remove('hidden'); stop.classList.remove('hidden'); }, onend: reset });
-    if (!r.ok) { reset(); if (r.reason === 'no-voice') note.textContent = u('no_voice', lang); }
+    note.textContent = lang === 'en' ? '' : u('voice_loading', lang);
+    try {
+      const r = await speak(getText(), lang, Number($('#rate').value), {
+        onstart: () => { note.textContent = ''; play.classList.add('hidden'); pause.classList.remove('hidden'); stop.classList.remove('hidden'); },
+        onend: reset,
+        onerror: () => { reset(); note.textContent = u('voice_error', lang); },
+      });
+      if (!r.ok) { reset(); if (r.reason === 'no-voice') note.textContent = u('no_voice', lang); }
+    } catch {
+      reset();
+      note.textContent = u('voice_error', lang);
+    }
   };
   play.onclick = start;
   pause.onclick = () => { paused ? resumeSpeaking() : pauseSpeaking(); paused = !paused; pause.setAttribute('aria-label', paused ? u('listen', lang) : u('pause', lang)); };

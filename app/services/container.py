@@ -9,6 +9,7 @@ from .embeddings import get_embedder
 from .gemini import GeminiClient
 from .retrieval import Retriever
 from .speech import Transcriber
+from .tts import LocalSpeechSynthesizer
 from .vectorstore import VectorStore
 from .websearch import WebSearch
 
@@ -27,6 +28,7 @@ class Services:
         self.gemini = GeminiClient(cfg["GEMINI_API_KEY"], cfg["GEMINI_MODEL"], cfg["GEMINI_TIMEOUT"])
         self.web = WebSearch(cfg["GOOGLE_CSE_API_KEY"], cfg["GOOGLE_CSE_CX"])
         self.stt = Transcriber(cfg["WHISPER_MODEL"], cfg["WHISPER_DEVICE"], cfg["WHISPER_COMPUTE_TYPE"])
+        self.tts = LocalSpeechSynthesizer()
 
     def ensure_ready(self) -> "Services":
         if self._ready:
