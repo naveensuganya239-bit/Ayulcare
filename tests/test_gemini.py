@@ -27,7 +27,7 @@ def test_translate_remedies_batches_and_rejects_number_changes(monkeypatch):
     assert result == ["Translated remedy with 2 leaves", None]
     assert len(calls) == 1
     assert calls[0][2] is True
-    assert calls[0][3] == 1000
+    assert calls[0][3] == 1900
 
 
 def test_cards_translate_all_remedies_in_one_call():
